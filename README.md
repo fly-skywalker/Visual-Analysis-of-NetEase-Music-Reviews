@@ -1,3 +1,17 @@
+### Results
+#### label
+![](results/11-队长-华语男歌手.png)
+![](results/11_label.png)
+#### select region
+![](results/因为爱情-陈奕迅-华语男歌手.png)
+![](results/因为爱情_part.png)
+#### select period
+![](results/1DLK-Reol-日本女歌手.png)
+![](results/1DLK_part.png)
+#### worldcloud
+![](results/22-Taylor%20Swift-欧美女歌手.png)
+![](results/因为爱情.png)
+
 ### Directory
 ```
 |--Visual Analysis of NetEase Music Reviews
@@ -108,13 +122,13 @@
 
 ```
 
-### Crawl data
+### Crawl Data
 ```
 cd data
 python crawler_comments.py
 ```
 
-### Key processing files
+### Key Processing Files
 
 #### h_artist.py
 
@@ -213,16 +227,3 @@ interaction_scatter_comments
 recover_scatter_comments
 ```
 
-### Results
-#### label
-![](results/11-队长-华语男歌手.png)
-![](results/11_label.png)
-#### select region
-![](results/因为爱情-陈奕迅-华语男歌手.png)
-![](results/因为爱情_part.png)
-#### select period
-![](results/1DLK-Reol-日本女歌手.png)
-![](results/1DLK_part.png)
-#### worldcloud
-![](results/22-Taylor%20Swift-欧美女歌手.png)
-![](results/因为爱情.png)
