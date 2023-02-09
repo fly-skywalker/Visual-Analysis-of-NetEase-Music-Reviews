@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<meta charset = "utf-8">
+
+<head>
+    <link href = "libs/bootstrap-3.4.1-dist/css/bootstrap.css" rel = "stylesheet">
+    <script src = "libs/js/jquery.js"></script>
+    <script src = "libs/js/bootstrap-treeview.js"></script>
+    <script src = "libs/js/d3.layout.cloud.js"></script>
+    <script src = "https://d3js.org/d3.v4.js"></script>
+</head>
+<style>
+    .tooltip{
+        font-family: simsun,serif;
+        font-size: 70%;
+        /*width: 200px;*/
+        height: auto;
+        position: absolute;
+        text-align: center;
+        padding: 1px;
+        border: 1px solid darkgray;
+        background-color: white;
+    }
+
+</style>
+
+<body>
+<div>
+    <div id = "blank" style = "width: 1536px; height: 20px"></div>
+    <div id = "line_up" style = "width: 1536px; height: 15px; background: grey"></div>
+    <div style = "display: flex">
+        <div id = "line_left" style = "width: 15px; height: 810px; background: grey"></div>
+        <div>
+            <div style = "display: flex">
+                <div id = "title" style = "width: 444px; height: 50px; text-align: center; font-size: 35px;
+                    color: white; background: red">可视化分析网易云音乐评论</div>
+                <div>
+                    <div id = "music_link_blank1" style = "width: 40px; height: 10px"></div>
+                    <div style="display: flex">
+                        <div id = "music_link_blank2" style = "width: 8px; height: 9px"></div>
+                        <button onclick="go_to_music()" id = "music_link" style = "width: 32px; height: 32px;
+                                     font-size: 10px; color: white; background: red; border-width: 0; border-radius: 16px">GO</button>
+                    </div>
+                </div>
+                <div id = "music_info" style = "width: 470px; height: 50px"></div>
+                <div id = "legend" style = "width: 550px; height: 50px"></div>
+            </div>
+            <div id = "line_title" style = "width: 1506px; height: 7px; background: grey"></div>
+            <div style = "display: flex">
+                <div>
+                    <div id = "tree" style = "width: 300px; height: 450px; overflow-y: scroll"></div>
+                    <div id = "line_tp" style = "width: 300px; height: 3px; background: grey"></div>
+                    <div id = "pie" style = "width: 300px; height: 300px"></div>
+                </div>
+                <div id = "line_tree" style = "width: 3px; height: 753px; background: grey"></div>
+                <div>
+                    <div style = "display: flex">
+                        <div id = "scatter" style = "width: 600px; height: 450px"></div>
+                        <div id = "line_scatter" style = "width: 3px; height: 450px; background: grey"></div>
+                        <div>
+                            <div id = "wordcloud" style = "width: 600px; height: 300px"></div>
+                            <div id = "line_wc" style = "width: 600px; height: 3px; background: grey"></div>
+                            <div style = "display: flex">
+                                <div id = "comments_space" style = "width: 10px; height: 147px"></div>
+                                <div id = "comments" style = "width: 590px; height: 147px; overflow-y: scroll"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id = "line_river" style = "width: 1203px; height: 3px; background: grey"></div>
+                    <div>
+                        <div style="display: flex">
+                            <button onclick = time_left()
+                                    style = "width: 25px; height: 25px; font-size: 1px">←</button>
+                            <input type="range" id="slide" min="2" max="1000" step="1" value="50" onchange= "reset()"
+                                   style="width: 1150px; height: 25px"/>
+                            <button onclick = time_right()
+                                    style = "width: 25px; height: 25px; font-size: 1px">→</button>
+                        </div>
+                        <div id = "river" style = "width: 1200px; height: 250px"></div>
+                        <div style="display: flex">
+                            <button onclick = transform() style = "width: 100px; height: 25px">transform</button>
+                            <button onclick = reset() style = "width: 100px; height: 25px">reset</button>
+                            <button onclick = change_option() style = "width: 100px; height: 25px">cursor</button>
+                            <div id = "river_info" style = "width: 903px; height: 25px"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id = "line_right" style = "width: 15px; height: 810px; background: grey"></div>
+    </div>
+    <div id = "line_down" style = "width: 1536px; height: 15px; background: grey"></div>
+</div>
+
+<script type = "module">
+
+    // let my_color = ["#c23531","#2f4554","#61a0a8","#d48265","#749f83","#ca8622","#bda29a","#6e7074","#546570","#c4ccd3","#f05b72","#ef5b9c","#f47920","#905a3d","#fab27b","#2a5caa","#444693","#726930","#b2d235","#6d8346","#ac6767","#1d953f","#6950a1","#918597"]
+    let my_color = ['#00a8e1', '#99cc00', '#e30039', '#fcd300', '#800080', '#00994e', '#ff6600', '#808000', '#db00c2', '#008080', '#0000ff', '#c8cc00']
+    let duration_time = 200;
+    let temp_fixed = false;
+    let fixed = false;
+    let choosing = false;
+
+    let all_data = null;
+    let label_counts = null;
+    let label_num = 0;
+    let part_array = null;
+
+    // let dataid = -1;
+    // let dataid = 1901371647  // 默认:孤勇者
+    // let dataid = 1907766514 // 默认: 11 - 队长
+    // let dataid = 1364751214 // 默认: Alone - FrogMonster
+    let dataid = 65528 // 默认: 淘汰 - 陈奕迅
+
+    let config_music_info = {fontsize: "18px"}
+    d3.select("#music_info")
+        .append("g")
+        .attr("style", "text-align: center; font-size: " + config_music_info.fontsize)
+        .html("&nbsp 全部歌手<br>&nbsp 歌手类型数:15&nbsp 歌手数:1499&nbsp 单曲数:61458")
+
+    function go_to_music(){
+        // if (dataid === -1)
+        //     return
+        // dataid = 919620061
+        window.open("https://music.163.com/#/song?id=" + dataid)
+    }
+    window.go_to_music = go_to_music
+
+    let config_legend = {width: 500, height: 50, margin: 10, opacity: 1, not_opacity: 0.3, tooltip_width: 40}
+    let svg_legend = d3.select("#legend")
+        .append("svg")
+        .attr("class", "svg_legend")
+        .attr("width", config_legend.width)
+        .attr("height", config_legend.height)
+
+    let config_pie = {width: 300, height: 300, inr: 0, outr: 125, opacity: 1, not_opacity: 0.3, tooltip_width: 40}
+    let svg_pie = d3.select("#pie")
+        .on("dblclick", ()=>{
+            fixed = 1 - fixed;
+            recover()
+        })
+        .append("svg")
+        .attr("class", "svg_pie")
+        .attr("width", config_pie.width)
+        .attr("height", config_pie.height)
+    let pie_part = false;
+
+    let config_scatter = {width: 600, height: 450, top: 10, right: 10, bottom: 10, left: 30, opacity: 0.7,
+        not_opacity: 0.05, tooltip_width: 100}
+    let svg_scatter = d3.select("#scatter")
+        .append("svg")
+        .attr('class', "svg_scatter")
+        .attr("width", config_scatter.width)
+        .attr("height", config_scatter.height)
+        .append("g")
+        .attr("transform", "translate(" + config_scatter.left + "," + config_scatter.top + ")");
+    let scatter_data = all_data;
+
+    d3.select("#comments")
+        .on("dblclick", ()=>{fixed=1-fixed})
+
+    let config_wc = {width: 600, height: 300, fontsize: 50, opacity: 0.9, not_opacity: 0.15, display: false}
+    let wc_display = false;
+    let svg_wordcloud = d3.select("#wordcloud")
+        .on("dblclick", ()=>{
+            wc_display = 1 - wc_display;
+            svg_wordcloud.selectAll("text")
+                .attr("temp", d => {
+                    d.style = "normal";
+                })
+            recover()
+        })
+        .append("svg")
+        .attr('class', "svg_worldcloud")
+        .attr("width", config_wc.width)
+        .attr("height", config_wc.height)
+        // .attr("style", "border: 1px solid black")
+        .attr("preserveAspectRatio","xMaxYMax meet")
+    // .append("g")
+    //     .attr("transform", "translate(" + config_scatter.left + "," + config_scatter.top + ")");
+
+    let config_river = {width: 1200, height: 250, left: 25, right: 25, opacity: 1, not_opacity: 0.05}
+    let svg_river = d3.select("#river")
+        .append("svg")
+        .attr("class", "svg_river")
+        .attr("width", config_river.width)
+        .attr("height", config_river.height)
+    let left = null
+    let right = null
+    let option = 0
+    let river_part = false;
+    let x_min = 0;
+    let x_max = 0;
+    let x_cursor = 0;
+    let x_slices = 0;
+    let x_step = 0;
+    let river_data = [];
+    let river_cat_len = 0;
+
+    // tip
+    let tooltip = d3.select("body")
+        .append("div")
+        .attr("class", "tooltip")
+        .style("opacity", 0.0);
+
+    import d_tree from "./data/songid/song_tree.json" assert {type: 'json'}
+    import d_music_info from "./data/songid/music_info.json" assert {type: 'json'}
+
+    run()
+    draw_tree()
+
+    // ================================================ Tree - select ==================================================
+
+    function draw_tree() {
+        $('#tree').treeview({
+            data: d_tree,
+            onNodeSelected: function (event, data){
+                // console.log(data)
+                // console.log(d)
+                console.log(data.Id)
+                dataid = data.Id;
+
+                console.log(dataid)
+
+                //alert(data.Id);
+                // console.log("data/songdata/" + data.Id + ".csv")
+
+                run()
+            }
+        });
+    }
+
+    // ================================================ Run Pipeline ===================================================
+
+    function run() {
+        // ================================ count music_info legend pie scatter comments ===============================
+
+        temp_fixed = false;
+        fixed = false;
+        pie_part = false;
+        river_part = false;
+        wc_display = false;
+
+        //Read the data
+        // console.log(data)
+        d3.csv("data/songdata/" + dataid + ".csv", function(data) {
+
+            // ------------------------------------------------ count --------------------------------------------------
+            all_data = data;
+            scatter_data = all_data;
+            scatter_data = scatter_data.slice(0, 1035);
+            label_counts = count_label(all_data)
+            label_num = label_counts.size;
+            part_array = new Array(label_num)
+            for (let i=0; i<label_num; i++)
+                part_array[i] = true
+
+            // ---------------------------------------------- music_info -----------------------------------------------
+            draw_music_info()
+
+            // ------------------------------------------------ legend -------------------------------------------------
+            draw_legend()
+
+            // ------------------------------------------------- pie ---------------------------------------------------
+            draw_pie()
+
+            // ----------------------------------------------- scatter -------------------------------------------------
+            draw_scatter()
+
+            // ================================================ comments ===============================================
+            draw_comments()
+        })
+
+        // ------------------------------------------ worldcloud -----------------------------------------------
+        draw_wordcloud()
+
+        // -------------------------------------------- river --------------------------------------------------
+
+        reset()
+        draw_river()
+    }
+
+    // =================================================== count =======================================================
+
+    function count_label(data, part=false){
+        let counts = new Map()
+        // if (part) {
+        //     for (let i=0; i<label_num; i++)
+        //         counts.set(i, 0);
+        // }
+        data.forEach((d, i) => {
+            if (part) {
+                if (!part_array[i])
+                    return
+            }
+            // console.log(i)
+            let num = counts.get(d.label)
+            if (num)
+                counts.set(d.label, ++num)
+            else
+                counts.set(d.label, 1);
+        })
+        // console.log(counts)
+        return counts
+    }
+
+    //  ================================================ music info ====================================================
+
+    function draw_music_info() {
+        let basic_music_info = d_music_info[dataid];
+        d3.select("#music_info").selectAll("g").remove()
+        d3.select("#music_info")
+            .append("g")
+            .attr("style", "text-align: center; font-size: " + config_music_info.fontsize)
+            .html(basic_music_info + "&nbsp 评论类型数: " + label_num)
+    }
+
+    //  ================================================= legend =======================================================
+
+    function draw_legend() {
+        let min_len = d3.min([ 1 / label_num / 2,
+            (config_legend.height - 2 * config_legend.margin) / config_legend.width])
+        let legend_len = [];
+        let ghost = [];
+        for (let i=0; i<label_num; i++) {
+            legend_len[legend_len.length] = label_counts.get(i.toString());
+            ghost[legend_len.length] = false;
+        }
+        let sum_comments = d3.sum(legend_len);
+        legend_len.forEach((d, i) => {
+            if (legend_len[i] / sum_comments < min_len)
+                ghost[i] = true;
+            legend_len[i] = d3.max([legend_len[i] / sum_comments, min_len]);
+        })
+        sum_comments = d3.sum(legend_len);
+        legend_len.forEach((d, i) => {
+            legend_len[i] = legend_len[i] / sum_comments * (config_legend.width - 2 * config_legend.margin);
+        })
+        let legend_info = []
+        let y_legend = config_legend.margin;
+        let h_legend = config_legend.height - 2 * config_legend.margin;
+        let x_legend = config_legend.margin;
+        legend_len.forEach((d, i) => {
+            legend_info[legend_info.length] = {
+                x: x_legend,
+                y: y_legend,
+                h: h_legend,
+                w: legend_len[i],
+                color: my_color[i],
+                label: i,
+                ghost: ghost[i]
+            }
+            // x_legend += legend_len[i] + config_legend.margin;
+            x_legend += legend_len[i];
+        })
+
+        svg_legend.selectAll('g').remove()
+        svg_legend.selectAll('g')
+            .data(legend_info)
+            .enter()
+            .append("g")
+        svg_legend.selectAll('g')
+            .append("rect")
+            .attr("x", d=>d.x)
+            .attr("y", d=>d.y)
+            .attr("width", d=>d.w)
+            .attr("height", d=>d.h)
+            .attr("fill", d=>d.color)
+            .attr("opacity", config_legend.opacity)
+            .on("click", (d)=>{
+                temp_fixed = true;
+                interaction(d.label)
+            })
+            .on("dblclick", ()=> {
+                fixed = 1 - fixed;
+                temp_fixed = false;
+                recover();
+            })
+        svg_legend.selectAll('g')
+            .append("text")
+            // .attr("temp", (d)=>{console.log(d)})
+            .attr("x", d=>d.x+d.w/2-d.h*0.15)
+            .attr("y", d=>d.y+d.h*0.75)
+            .attr("font-size", d=>d.h*0.6)
+            .attr("fill", (d) => {
+                // console.log(d.ghost)
+                if (d.ghost)
+                    return "black";
+                else
+                    return "white";
+            })
+            .text((d)=>d.label)
+            .on("click", (d)=>{
+                temp_fixed = true;
+                interaction(d.label)
+            })
+            .on("dblclick", ()=> {
+                fixed = 1 - fixed;
+                temp_fixed = false;
+                recover();
+            })
+    }
+
+    //  =================================================== pie ========================================================
+
+    function draw_pie(part=false) {
+        d3.select("#pie").selectAll("g").remove()
+        // console.log(label_counts, label_counts.size)
+        let pie_label_counts = label_counts;
+        if (part)
+            pie_label_counts = count_label(all_data, true)
+        let pie_v = []
+        for (let i=0; i < label_num; i++){
+            pie_v[pie_v.length] = pie_label_counts.get(i.toString())
+        }
+        let sum_pie_v = d3.sum(pie_v);
+        let pie = d3.pie()
+            .sort(null)
+        let arc_generator = d3.arc()
+            .innerRadius(config_pie.inr)
+            .outerRadius(config_pie.outr)
+        let pie_data = pie(pie_v)
+
+        let colorScale = d3.scaleOrdinal()
+            .domain(d3.range(0, pie.length))
+            .range(my_color.slice(0, pie_v.length))
+
+        svg_pie.selectAll('g')
+            .data(pie_data)
+            .enter()
+            .append("g")
+            .attr('transform', 'translate(150, 150)')
+            .append("path")
+            // .attr('class', (d, i) => "pie" + i)
+            .attr("d", d => arc_generator(d))
+            .attr("fill", (d, i) => colorScale(i))
+            .attr("opacity", config_pie.opacity)
+            .on("mouseover",function(d, i){
+                // console.log(d, i)
+                tooltip.html(i + ': ' + d.value + ', ' + Math.round(d.value/sum_pie_v*100) + "%")
+                    .style("width", config_pie.tooltip_width)
+                    .style("left", (d3.event.pageX) + "px")
+                    .style("top", (d3.event.pageY) + "px")
+                    .style("opacity", 1.0)
+                    .transition()
+                    .duration(duration_time)
+                interaction(i)
+            })
+            .on("mouseout",function(d,i){
+                tooltip
+                    .style("opacity", 0.0)
+                    .transition()
+                    .duration(duration_time)
+                recover()
+            })
+            .on("mousemove",function(d, i){
+                tooltip
+                    .style("left", (d3.event.pageX + 10) + "px")
+                    .style("top", (d3.event.pageY - 10) + "px")
+                    .transition()
+                    .duration(duration_time)
+            })
+            .on("click", ()=>{temp_fixed=true})
+
+        // g_pie.append("text")
+        //     .attr("transform", d => {
+        //         return "translate(" + arc_generator.centroid(d) + ")";
+        //     })
+        //     .attr("text-anchor", "middle")
+        //     .text(d => d.value)
+    }
+
+    // =================================================== scatter =====================================================
+
+    function draw_scatter() {
+        // ------------------------------------------- scatter -----------------------------------------------------
+        svg_scatter.selectAll("circle").remove()
+        svg_scatter.selectAll("g").remove()
+
+        // Add X axis
+        let xscale_scatter = d3.scaleLinear()
+            .domain([-d3.max(scatter_data, function(d) { return Math.abs(d.first); }),
+                d3.max(scatter_data, function(d) { return Math.abs(d.first); })])
+            .range([0, config_scatter.width - config_scatter.left - config_scatter.right]);
+        svg_scatter.append("g")
+            .attr("transform", "translate(0, 0)")
+            .call(d3.axisBottom(xscale_scatter));
+
+        // Add Y axis
+        let yscale_scatter = d3.scaleLinear()
+            .domain([-d3.max(scatter_data, function(d) { return Math.abs(d.second); }),
+                d3.max(scatter_data, function(d) { return Math.abs(d.second); })])
+            .range([config_scatter.height - config_scatter.top - config_scatter.bottom, 0]);
+        svg_scatter.append("g")
+            .call(d3.axisLeft(yscale_scatter));
+
+        // Add dots
+
+        svg_scatter.append('g')
+            .selectAll("dot")
+            .data(scatter_data)
+            .enter()
+            .append("circle")
+            // .attr("class", (d) => "scatter" + d.label)
+            .attr("id", (d, i) => "scatter_id_" + i)
+            .attr("cx", function (d) { return xscale_scatter(d.first); } )
+            .attr("cy", function (d) { return yscale_scatter(d.second); } )
+            .attr("r", function(d) { return (3 + Math.log(d.likes + 1)) * 0.8} )
+            .attr("fill", function(d) { return d3.rgb(my_color[d.label])} )
+            .attr("opacity", config_scatter.opacity)
+            .on("mouseover", (d) => {
+                if (choosing)
+                    return
+                interaction(d.label)
+                tooltip.html(d['comment'])
+                    .style("width", config_scatter.tooltip_width)
+                    .style("left", (d3.event.pageX) + "px")
+                    .style("top", (d3.event.pageY) + "px")
+                    .style("opacity", 1.0)
+                    .transition()
+                    .duration(duration_time)
+            })
+            .on("mouseout", () => {
+                if (choosing)
+                    return
+                recover()
+                tooltip
+                    .style("opacity", 0.0)
+                    .transition()
+                    .duration(duration_time)
+            })
+            .on("mousemove",function(d, i){
+                if (choosing)
+                    return
+                tooltip
+                    .style("left", (d3.event.pageX + 10) + "px")
+                    .style("top", (d3.event.pageY - 10) + "px")
+                    .transition()
+                    .duration(duration_time)
+            })
+
+        svg_scatter.append("g")
+            .append("rect")
+            .attr("id", "selection_box")
+            // .attr("id", (d) => "selection_line_" + d.i)
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("width", 0)
+            .attr("height", 0)
+            .attr("fill", my_color[label_num])
+            .attr("opacity", 0)
+            .style("stroke", "red")
+            .style("stroke-width", 5)
+
+        // d3.select("#selection_box")
+
+        let former_fixed = fixed;
+        let former_click_time = 0;
+        let start_time = 0;
+        let x = 0;
+        let y = 0;
+        let xs = 0;
+        let xb = 0;
+        let ys = 0;
+        let yb = 0;
+
+        d3.select("#scatter")
+            .on("mousedown", function (){
+                start_time = (new Date()).getTime()
+                x = d3.event.offsetX;
+                y = d3.event.offsetY;
+                xs = x;
+                xb = x;
+                ys = y;
+                yb = y;
+
+                choosing = true;
+                former_fixed = fixed;
+                fixed = true;
+            })
+            .on("mousemove", ()=>{
+                if (choosing) {
+                    if (new Date().getTime() - start_time > duration_time / 2)
+                        svg_scatter.select("#selection_box")
+                            .attr("opacity", 0.1)
+
+                    x = d3.event.offsetX;
+                    y = d3.event.offsetY;
+                    if (x < xs)
+                        xs = x;
+                    if (x > xb)
+                        xb = x;
+                    if (y < ys)
+                        ys = y;
+                    if (y > yb)
+                        yb = y;
+                    // console.log(xs, xb, ys, yb)
+                    svg_scatter.select("#selection_box")
+                        .attr("x", xs)
+                        .attr("y", ys)
+                        .attr("width", xb - xs)
+                        .attr("height", yb - ys)
+                }
+            })
+            .on("mouseup", ()=>{
+                // console.log((new Date()).getTime() - start_time)
+                // exclude click
+
+                svg_scatter.select("#selection_box")
+                    .attr("opacity", 0)
+                    .attr("x", 0)
+                    .attr("y", 0)
+                    .attr("width", 0)
+                    .attr("height", 0)
+
+                let t = (new Date()).getTime();
+                if (t - start_time < duration_time){
+                    // dblclick
+                    if (t - former_click_time < duration_time) {
+                        fixed = 1 - former_fixed;
+                        console.log("recover")
+                        recover();
+                    }
+                    // click
+                    else {
+                        former_click_time = t;
+                        fixed = former_fixed;
+                    }
+                    choosing = false;
+                    // console.log(temp_fixed, fixed, former_fixed)
+                    return
+                }
+
+                d3.selectAll(".comments_html").remove() // remove comments
+
+                // d3.select(".tr_path")
+                //     .attr("opacity", config_river.not_opacity)
+                //
+                // let labels2times = new Map()
+                // let temp_times = null
+
+                d3.select("#scatter")
+                    .selectAll("circle")
+                    .attr("opacity", (d, i) => {
+                        x = xscale_scatter(d.first);
+                        y = yscale_scatter(d.second);
+                        // x = xscale_scatter(d.first) + config_scatter.left;
+                        // y = yscale_scatter(d.second) + config_scatter.top;
+                        if (xs <= x && x <= xb && ys <= y && y <= yb) {
+                            // console.log(i)
+                            // comments
+                            d3.select("#comments")
+                                .append('g')
+                                .attr("style", "color: " + my_color[d['label']])
+                                .html(get_time(d))
+                                .attr("class", "comments_html")
+                            // // stream
+                            // temp_times = labels2times.get(d.label)
+                            // if (temp_times)
+                            //     labels2times.set(d.label, temp_times.add(d.time))
+                            // else
+                            //     labels2times.set(d.label, new Set([d.time]))
+                            part_array[i] = true;
+                            return config_scatter.opacity
+                        }
+                        else {
+                            part_array[i] = false;
+                            return config_scatter.not_opacity
+                        }
+                    })
+                choosing = false;
+
+                console.log("pie_part")
+                draw_pie(true)
+                pie_part = true;
+
+                // console.log(labels2times)
+                //
+                // let labels2indexes = new Map();
+                // labels2times.forEach((times, lb) => {
+                //     let indexes = []
+                //     times.forEach((t) => {
+                //         let index = 0;
+                //         for(let i = 0; i < x_slices; i ++){
+                //             if(Math.abs(t - river_data[0][i][0]) <= 0.5 * x_step){
+                //                 index = i
+                //                 break
+                //             }
+                //         }
+                //         indexes[indexes.length] = index
+                //     })
+                //     labels2indexes.set(lb, indexes.sort())
+                // })
+                // console.log(labels2times)
+            })
+    }
+
+    // ================================================== comments =====================================================
+    function get_time(d){
+        let time = new Date(Number(d['time'])).toLocaleString().replace(/:\d{1,2}$/,' ')
+        return "&nbsp &nbsp &nbsp &nbsp" + d['comment'] + "&nbsp (点赞: " + d['likes'] + ";&nbsp "
+            + time + ")<br><br>"
+    }
+
+    function draw_comments_html(label=-1){
+        d3.selectAll(".comments_html").remove()
+
+        // console.log(label)
+
+        if (label === -1){
+            d3.selectAll(".comments_store")
+                .attr("temp", (d) => {
+                    // console.log("d", d)
+                    d3.select("#comments")
+                        .append('g')
+                        .attr("style", "color: " + my_color[d['label']])
+                        .html(get_time(d))
+                        .attr("class", "comments_html")
+                })
+        }
+        else {
+            label = label.toString()
+            d3.selectAll(".comments_store")
+                .attr("temp", (d) => {
+                    if (d['label'] !== label)
+                        return
+                    d3.select("#comments")
+                        .append('g')
+                        .attr("style", "color: " + my_color[d['label']])
+                        .html(get_time(d))
+                        .attr("class", "comments_html")
+                })
+        }
+    }
+
+    function draw_comments() {
+        d3.select("#comments").selectAll('g').remove()
+
+        // ------------------- store comments ------------
+        d3.select("#comments").append('g')
+            .selectAll("text")
+            .data(all_data)
+            .enter()
+            .append("text")
+            .attr("class", "comments_store")
+            .attr("id", (d, i) => "comments_store_" + i)
+
+        draw_comments_html()
+    }
+
+    // ================================================== Word Cloud ===================================================
+
+    function draw_wordcloud() {
+        // import wc_data from "./data/tfidf/wc_1907766514.json" assert {type: 'json'}
+        $.get("./data/tfidf/wc_" + dataid + ".json", function (wc_data){
+            // console.log(wc_data)
+            d3.select(".svg_worldcloud").selectAll("text").remove()
+
+            // let scalex_wc = d3.scaleLinear()
+            //     .domain([-config_wc.width/2, config_wc.width/2])
+            //     .range([-config_wc.width/2+config_wc.fontsize/2, config_wc.width/2-config_wc.fontsize/2]);
+            // let scaley_wc = d3.scaleLinear()
+            //     .domain([-config_wc.height/2, config_wc.height/2])
+            //     .range([-config_wc.height/2+config_wc.fontsize/2, config_wc.height/2-config_wc.fontsize/2]);
+
+            let layout_wc = d3.layout.cloud()
+                .size([config_wc.width - config_wc.fontsize, config_wc.height - config_wc.fontsize])
+                .words(wc_data.map(function(d) {
+                    return {text: d.text, size:d.size, color: d3.rgb(my_color[d.label]), label: d.label}
+                }))
+                //.rotate(function() { return ~~(Math.random() * 2) * 90; })
+                .rotate(0)
+                .font("Impact")
+                .fontSize(function(d) { return d.size * config_wc.fontsize; })
+                .on("end", _draw_wordcloud)
+
+            layout_wc.start();
+
+            function _draw_wordcloud(words) {
+                svg_wordcloud.append("g")
+                    .attr("transform", "translate("+(config_wc.width/2- config_wc.fontsize/2)+", "+config_wc.height/2+")")
+                    .selectAll("text")
+                    .data(words)
+                    .enter()
+                    .append("text")
+                    .style("font-size", function(d) { return d.size + "px"; })
+                    .style("fill", function(d, i) { return d.color; })
+                    .attr("transform", function(d) {
+                        // console.log(d.x, d.y)
+                        // return "translate(" + [scalex_wc(d.x), scaley_wc(d.y)] + ")rotate(" + d.rotate + ")"
+                        return "translate(" + [d.x, d.y] + ")rotate(" + d.rotate + ")"
+                    })
+                    .text(function(d) { return d.text; })
+                    .on("mouseenter", function (actual, i) {
+                        if (!wc_display)
+                            interaction(actual.label)
+                    })
+                    .on("mouseout", function (actual, i) {
+                        if (!wc_display)
+                            recover()
+                    })
+                    .on("click", (d_wc)=>{
+                        wc_display = true;
+                        if (d_wc.style === "normal") {
+                            d_wc.style = "fixed";
+                            svg_wordcloud.selectAll("text")
+                                .style("opacity", (d) => {
+                                    if (d.style === "fixed")
+                                        return config_wc.opacity;
+                                    else
+                                        return config_wc.not_opacity;
+                                })
+                            d3.selectAll(".comments_html").remove()
+                            d3.selectAll(".comments_store")
+                                .attr("temp", (d) => {
+                                    // console.log(d)
+                                    if (river_part) {
+                                        if (left < d.time || d.time > right)
+                                            return
+                                    }
+                                    if (d['comment'].search(d_wc.text) === -1)
+                                        return
+                                    d3.select("#comments")
+                                        .append('g')
+                                        .attr("style", "color: " + my_color[d['label']])
+                                        .html(get_time(d))
+                                        .attr("class", "comments_html")
+                                })
+                        }
+                        else
+                            d_wc.style = "normal";
+                            svg_wordcloud.selectAll("text")
+                                .style("opacity", (d) => {
+                                    if (d.style === "fixed")
+                                        return config_wc.opacity;
+                                    else
+                                        return config_wc.not_opacity;
+                                })
+                    })
+            }
+        })
+    }
+
+    // =================================================== Stream ======================================================
+
+    function draw_river(data_min = null, data_max = null){
+
+        d3.select("#river").select("svg").remove()
+        svg_river = d3.select("#river")
+            .append("svg")
+            .attr("class", "svg_river")
+            .attr("width", config_river.width)
+            .attr("height", config_river.height)
+
+        $.get("data/river/tr_" + dataid + ".json", function(raw_data) {
+            //$.get("river/tr_1907766514.json", function(raw_data) {
+
+            // console.log(raw_data)
+
+            let data_len = raw_data.length
+            //console.log(data_len)
+
+            x_max = raw_data[data_len-1][0]
+            x_min = raw_data[0][0]
+            console.log("mm", x_min, x_max)
+
+            river_cat_len = raw_data[0].length-1
+            //console.log(cat_len)
+
+            x_slices = document.getElementById("slide").value;
+
+            // console.log(x_slices)
+
+            x_step = (x_max - x_min) / x_slices;
+
+            let inter_data = []
+            for (let i = 0; i < x_slices; i ++){
+                let key_time = []
+                key_time.push(x_min + x_step * (i + 0.5))
+                for (let j = 0; j < river_cat_len; j ++){
+                    key_time.push(0)
+                }
+                inter_data.push(key_time)
+            }
+
+            for (let i = 0; i < data_len; i ++){
+                let t_this = raw_data[i][0]
+                let k = 0
+                for(let j = 0; j < x_slices; j ++){
+                    if(x_min + j * x_step <= t_this && t_this <= x_min + (j + 1) * x_step){
+                        k = j
+                        break
+                    }
+                }
+                for(let j = 0; j < river_cat_len; j ++){
+                    inter_data[k][j + 1] += raw_data[i][j + 1]
+                }
+            }
+            //console.log(inter_data)
+
+            river_data = []
+            for (let i = 0; i < river_cat_len; i ++){
+                river_data.push([])
+            }
+
+            for (let i = 0; i < x_slices; i ++){
+                let y_sum = 0
+                for(let j = 0; j < river_cat_len; j ++){
+                    y_sum += inter_data[i][j + 1]
+                }
+                let y0 = - y_sum / 2
+                let y1 = 0
+                for(let j = 0; j < river_cat_len; j ++){
+                    y1 = y0 + inter_data[i][j + 1]
+                    river_data[j].push([inter_data[i][0], j, y0, y1])
+                    y0 = y1
+                }
+            }
+
+            //console.log(data)
+
+            if(data_min == null && data_max == null){
+                data_min = x_min;
+                data_max = x_max;
+            }
+            let xscale_river = d3.scaleLinear()
+                //.domain([new Date(Number(data[0][0][0].slice(0, 4)), Number(data[0][0][0].slice(5, 7)),
+                // Number(data[0][0][0].slice(8, 10))), new Date(Number(data[0][data[0].length-1][0].slice(0, 4)),
+                // Number(data[0][data[0].length-1][0].slice(5, 7)), Number(data[0][data[0].length-1][0].slice(8, 10)))])
+                .domain([data_min, data_max])
+                .range([config_river.left, config_river.width - config_river.right]);
+
+            let tscale_river = d3.scaleTime()
+                .domain([new Date(data_min), new Date(data_max)])
+                .range([config_river.left, config_river.width - config_river.right])
+
+            let bscaler_river = d3.scaleLinear()
+                .domain([2, 1000])
+                .range([config_river.left, config_river.width - config_river.right])
+
+            let yscale_river = d3.scaleLinear()
+                .domain([d3.min(river_data, function(d1){return d3.min(d1, function(d){return d[2]})}),
+                    d3.max(river_data, function(d1){return d3.max(d1, function(d){return d[3]})})])
+                .range([config_river.height, 0])
+
+            let area = d3.area()
+                //.x(function(d) { return x(new Date(Number(d[0].slice(0, 4)),
+                // Number(d[0].slice(5, 7)), Number(d[0].slice(8, 10)))); })
+                .x(function(d) {
+                    if ((xscale_river(d[0])) < 30)
+                        return 30
+                    return xscale_river(d[0])
+                })
+                .y0(function(d) { return yscale_river(d[2]); })
+                .y1(function(d) { return yscale_river(d[3]); });
+
+            svg_river.selectAll("path")
+                .data(river_data)
+                .enter()
+                .append("path")
+                .attr("d", area)
+                .attr("fill", function(d) {return d3.rgb(my_color[d[0][1]])})
+                .attr("class", "tr_path")
+                .attr("id", (d, i) => "tr_path_id_" + i)
+            // .attr("temp", (d, i) => {
+            //     console.log(i, d)
+            // })
+
+            svg_river.append("g")
+                .call(d3.axisBottom(bscaler_river));
+            svg_river.append("g")
+                .call(d3.axisRight(yscale_river))
+                .attr("transform", "translate(3, 0)")
+            svg_river.append("g")
+                .attr("transform", "translate(0," + (config_river.height-1) + ")")
+                .call(d3.axisTop(tscale_river));
+
+            svg_river.selectAll(".tr_path")
+                .on("mouseenter", function(d, i){
+                    interaction(d[0][1])
+                })
+                .on("mouseout", function(d, i){
+                    recover()
+                })
+
+            svg_river
+                .append("line")
+                .attr("id", "river_line_left")
+                .attr("x1", 0)
+                .attr("x2", 0)
+                .attr("y1", 0)
+                .attr("y2", config_river.height)
+                .attr("stroke", "red")
+                .attr("stroke-width", "1px")
+            svg_river
+                .append("line")
+                .attr("id", "river_line_right")
+                .attr("x1", 0)
+                .attr("x2", 0)
+                .attr("y1", 0)
+                .attr("y2", config_river.height)
+                .attr("stroke", "blue")
+                .attr("stroke-width", "1px")
+            svg_river
+                .append("line")
+                .attr("id", "river_line_3")
+                .attr("x1", 0)
+                .attr("x2", 0)
+                .attr("y1", 0)
+                .attr("y2", config_river.height)
+                .attr("stroke", "black")
+                .attr("stroke-width", "1px")
+
+            svg_river
+                .on("click", function(d){
+                    x_cursor = d3.event.offsetX;
+                    set_cursor()
+
+                    // -------------------------------- stream info --------------------------------------
+                    stream_info()
+
+                })
+                .on("dblclick", function(d){
+                    console.log(option)
+                    change_option()
+                })
+        })
+    }
+
+    function set_cursor() {
+        let timestamp = (((x_cursor - config_river.left) / (config_river.width - config_river.left - config_river.right))
+            * (x_max - x_min) + x_min)
+        if (x_cursor < config_river.left)
+            x_cursor = config_river.left
+        if (x_cursor > config_river.width - config_river.right)
+            x_cursor = config_river.width - config_river.right
+        if(option === 0){
+            d3.select("#river_line_left")
+                .attr("x1", x_cursor)
+                .attr("x2", x_cursor)
+            left = timestamp
+        }
+        else if(option === 1){
+            d3.select("#river_line_right")
+                .attr("x1", x_cursor)
+                .attr("x2", x_cursor)
+            right = timestamp
+        }
+        else if(option === 2){
+            d3.select("#river_line_3")
+                .attr("x1", x_cursor)
+                .attr("x2", x_cursor)
+        }
+    }
+
+    function stream_info() {
+        if (x_cursor < config_river.left)
+            x_cursor = config_river.left
+        let timestamp = (((x_cursor - config_river.left) / (config_river.width - config_river.right - config_river.left))
+            * (x_max - x_min) + x_min)
+        let index = 0;
+        for(let i = 0; i < x_slices; i ++){
+            if(Math.abs(timestamp - river_data[0][i][0]) <= 0.5 * x_step){
+                index = i
+                break
+            }
+        }
+        let htmlstring = "&nbsp" + new Date(timestamp) + "&nbsp"
+        for(let i = 0; i < river_cat_len; i ++){
+            htmlstring += "&nbsp" + i + ": " + (river_data[i][index][3] - river_data[i][index][2]) + "; "
+        }
+        // console.log(htmlstring)
+        d3.select("#river_info").selectAll("g").remove()
+        d3.select("#river_info")
+            .append("g")
+            .attr("style", "font-size: 18px")
+            .html(htmlstring)
+    }
+
+    // ----------------------------- button -------------------
+    function transform(){
+        console.log(left, right)
+        if(option === 2){
+            if (left > right) {
+                let temp = left;
+                left = right;
+                right = temp;
+            }
+            draw_river(left, right)
+        }
+        // fixed = true;
+        river_part = true;
+        recover_scatter_comments()
+    }
+
+    function reset(){
+        river_part = false;
+        option = 0
+        left = null
+        right = null
+        x_cursor = 0
+        d3.select("#river_line_left")
+            .attr("x1", 0)
+            .attr("x2", 0)
+        d3.select("#river_line_right")
+            .attr("x1", 0)
+            .attr("x2", 0)
+        d3.select("#river_line_3")
+            .attr("x1", 0)
+            .attr("x2", 0)
+        draw_river()
+        fixed = false;
+        temp_fixed = false;
+        recover();
+    }
+
+    function time_left() {
+        x_cursor -= 1;
+        set_cursor()
+        stream_info()
+    }
+
+    function time_right() {
+        x_cursor += 1;
+        set_cursor()
+        stream_info()
+    }
+
+    function change_option() {
+        if(option === 0){
+            option = 1
+        }
+        else if(option === 1){
+            option = 2
+        }
+    }
+
+    // ================================================= Interaction ===================================================
+
+    function interaction(label){
+        // console.log(temp_fixed, fixed);
+        if (fixed)
+            return
+        temp_fixed = false;
+        interaction_scatter_comments(label)
+        d3.select("#pie")
+            .selectAll("g")
+            .transition()
+            .duration(duration_time)
+            .attr("opacity", (d, i) => {
+                if (Number(label) === i)
+                    return config_pie.opacity
+                else
+                    return config_pie.not_opacity
+            })
+        // d3.select("#worldcloud")
+        if (! wc_display) {
+            d3.select(".svg_worldcloud")
+                .selectAll("text")
+                .transition()
+                .duration(duration_time)
+                .style('opacity', function(d){
+                    // console.log(d.label)
+                    if(Number(label) === d.label || "fixed" === d.style){
+                        return config_wc.opacity
+                    }
+                    else{
+                        return config_wc.not_opacity
+                    }
+                });
+        }
+        d3.selectAll(".tr_path")
+            .transition()
+            .duration(duration_time)
+            .attr("opacity", function(actual, j){
+                if(actual[0][1] === Number(label)){
+                    return config_river.opacity;
+                }
+                else{
+                    return config_river.not_opacity;
+                }
+            })
+        d3.select("#legend")
+            .selectAll("rect")
+            .attr("y", (d, i) => {
+                if (i === Number(label))
+                    return d.y - config_legend.margin / 2;
+                else
+                    return d.y;
+            })
+            .attr("height", (d, i) => {
+                if (i === Number(label))
+                    return d.h + config_legend.margin;
+                else
+                    return d.h;
+            })
+    }
+
+    function recover(){
+        // console.log(temp_fixed, fixed);
+        if (temp_fixed || fixed)
+            return
+        recover_scatter_comments()
+        if (pie_part && !river_part) {
+            draw_pie()
+            pie_part = false;
+        }
+        d3.select("#pie")
+            .selectAll("g")
+            .transition()
+            .duration(duration_time)
+            .attr("opacity", config_pie.opacity)
+        if (! wc_display) {
+            d3.select(".svg_worldcloud")
+                .selectAll("text")
+                .transition()
+                .duration(duration_time)
+                .style('opacity', config_wc.opacity)
+        }
+        d3.selectAll(".tr_path")
+            .transition()
+            .duration(duration_time)
+            .attr("opacity", config_river.opacity)
+        d3.select("#legend")
+            .selectAll("rect")
+            .attr("y", (d) => d.y)
+            .attr("height", (d) => d.h)
+    }
+
+    function interaction_scatter_comments(label) {
+        if (river_part) {
+            // remove comments
+            d3.selectAll(".comments_html").remove()
+            d3.select("#scatter")
+                .selectAll("circle")
+                .attr("opacity", (d, i) => {
+                    if (left <= d.time && d.time <= right && label.toString() === d.label) {
+                        d3.select("#comments")
+                            .append('g')
+                            .attr("style", "color: " + my_color[d['label']])
+                            .html(get_time(d))
+                            .attr("class", "comments_html")
+                        return config_scatter.opacity
+                    }
+                    else {
+                        return config_scatter.not_opacity
+                    }
+                })
+        }
+        else {
+            d3.select("#scatter")
+                .selectAll("circle")
+                .transition()
+                .duration(duration_time)
+                .attr("opacity", (d) => {
+                    // console.log(d)
+                    if (label.toString() === d.label)
+                        return config_scatter.opacity
+                    else
+                        return config_scatter.not_opacity
+                })
+            draw_comments_html(label)
+        }
+    }
+
+    function recover_scatter_comments() {
+        if (river_part) {
+            // remove comments
+            d3.selectAll(".comments_html").remove()
+            d3.select("#scatter")
+                .selectAll("circle")
+                .attr("opacity", (d, i) => {
+                    if (left <= d.time && d.time <= right) {
+                        d3.select("#comments")
+                            .append('g')
+                            .attr("style", "color: " + my_color[d['label']])
+                            .html(get_time(d))
+                            .attr("class", "comments_html")
+                        part_array[i] = true;
+                        return config_scatter.opacity
+                    }
+                    else {
+                        part_array[i] = false;
+                        return config_scatter.not_opacity
+                    }
+                })
+            pie_part = true;
+            draw_pie(true);
+        }
+        else {
+            d3.select("#scatter")
+                .selectAll("circle")
+                .transition()
+                .duration(duration_time)
+                .attr("opacity", config_scatter.opacity)
+            draw_comments_html()
+        }
+    }
+
+    // ============================================== module Js to window ==============================================
+
+    window.transform = transform;
+    window.reset = reset;
+    window.time_left = time_left;
+    window.time_right = time_right;
+    window.change_option = change_option;
+
+</script>
+
+</body>
